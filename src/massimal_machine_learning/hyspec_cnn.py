@@ -5,7 +5,7 @@ import numpy as np
 import tensorflow as tf
 
 
-def pad_image_to_multiple(image, multiple):
+def pad_image_to_multiple(image: np.ndarray, multiple: int) -> np.ndarray:
     """Zero-pad image spatially to multiple of given number
 
     # Input arguments
@@ -40,13 +40,13 @@ def pad_image_to_multiple(image, multiple):
 
 # Function for extracting tiles
 def labeled_image_to_tensor_tiles(
-    image,
-    labels,
-    tile_shape,
-    tile_strides=None,
-    padding="SAME",
-    min_labeled_fraction=0.05,
-):
+    image: np.ndarray,
+    labels: np.ndarray,
+    tile_shape: tuple[int, int],
+    tile_strides: tuple[int, int] | None = None,
+    padding: str = "SAME",
+    min_labeled_fraction: float = 0.05,
+) -> tuple[tf.Tensor, tf.Tensor]:
     """Split image and label mask into smaller tiles
 
     # Usage:
@@ -101,17 +101,17 @@ def labeled_image_to_tensor_tiles(
 
 
 def resampling_layer(
-    resampling_type,
-    filter_channels,
-    kernel_size,
-    resampling_factor=2,
-    name=None,
-    initializer_mean=0.0,
-    initializer_std=0.02,
-    apply_batchnorm=True,
-    apply_dropout=False,
-    dropout_rate=0.5,
-):
+    resampling_type: str,
+    filter_channels: int,
+    kernel_size: int,
+    resampling_factor: int = 2,
+    name: str | None = None,
+    initializer_mean: float = 0.0,
+    initializer_std: float = 0.02,
+    apply_batchnorm: bool = True,
+    apply_dropout: bool = False,
+    dropout_rate: float = 0.5,
+) -> tf.keras.Sequential:
     """Spatial resampling 2D convolutional layer
 
     # Input parameters:
@@ -178,16 +178,16 @@ def resampling_layer(
 
 
 def unet(
-    input_channels,
-    output_channels,
-    first_layer_channels,
-    depth,
-    model_name=None,
-    flip_aug=True,
-    trans_aug=False,
-    apply_batchnorm=True,
-    apply_dropout=False,
-):
+    input_channels: int,
+    output_channels: int,
+    first_layer_channels: int,
+    depth: int,
+    model_name: str | None = None,
+    flip_aug: bool = True,
+    trans_aug: bool = False,
+    apply_batchnorm: bool | Iterable[bool] = True,
+    apply_dropout: bool | Iterable[bool] = False,
+) -> tf.keras.Model:
     """Simple encoder-decoder U-Net architecture
 
     # Arguments:
@@ -337,7 +337,9 @@ def unet(
     return model
 
 
-def add_background_zero_weight(image, labels):
+def add_background_zero_weight(
+    image: tf.Tensor, labels: tf.Tensor
+) -> tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
     """Add weight "image" with zero weight for background
 
     # Typical usage:
@@ -354,7 +356,7 @@ def add_background_zero_weight(image, labels):
     return image, labels, sample_weights
 
 
-def unet_classify_single_image(unet, image):
+def unet_classify_single_image(unet: tf.keras.Model, image: np.ndarray) -> np.ndarray:
     """Classify single image using UNet
 
     # Arguments:
@@ -372,7 +374,7 @@ def unet_classify_single_image(unet, image):
     return labels
 
 
-def unet_classify_image_batch(unet, batch):
+def unet_classify_image_batch(unet: tf.keras.Model, batch: np.ndarray) -> np.ndarray:
     """Classify image batch using UNet
 
     # Arguments:
