@@ -3,6 +3,19 @@ from collections.abc import Iterable
 
 import numpy as np
 import tensorflow as tf
+from tensorflow.keras import Model, Sequential
+from tensorflow.keras.layers import (
+    BatchNormalization,
+    Concatenate,
+    Conv2D,
+    Conv2DTranspose,
+    Dropout,
+    Input,
+    LeakyReLU,
+    RandomFlip,
+    RandomTranslation,
+    ReLU,
+)
 
 
 def pad_image_to_multiple(image: np.ndarray, multiple: int) -> np.ndarray:
@@ -121,7 +134,7 @@ def resampling_layer(
     apply_batchnorm: bool = True,
     apply_dropout: bool = False,
     dropout_rate: float = 0.5,
-) -> tf.keras.Sequential:
+) -> Sequential:
     """
     Spatial resampling 2D convolutional layer.
 
@@ -167,12 +180,12 @@ def resampling_layer(
     )
 
     # Initialize as sequential (stack of layers)
-    resamp_layer = tf.keras.Sequential(name=name)
+    resamp_layer = Sequential(name=name)
 
     # Add 2D convolutional layer
     if resampling_type == "downsample":
         resamp_layer.add(
-            tf.keras.layers.Conv2D(
+            Conv2D(
                 filter_channels,
                 kernel_size,
                 strides=resampling_factor,
@@ -183,7 +196,7 @@ def resampling_layer(
         )
     else:
         resamp_layer.add(
-            tf.keras.layers.Conv2DTranspose(
+            Conv2DTranspose(
                 filter_channels,
                 kernel_size,
                 strides=resampling_factor,
@@ -195,17 +208,17 @@ def resampling_layer(
 
     # Add (optional) batch normalization layer
     if apply_batchnorm:
-        resamp_layer.add(tf.keras.layers.BatchNormalization())
+        resamp_layer.add(BatchNormalization())
 
     # Add (optional) dropout layer
     if apply_dropout:
-        resamp_layer.add(tf.keras.layers.Dropout(dropout_rate))
+        resamp_layer.add(Dropout(dropout_rate))
 
     # Add activation layer
     if resampling_type == "downsample":
-        resamp_layer.add(tf.keras.layers.LeakyReLU())
+        resamp_layer.add(LeakyReLU())
     else:
-        resamp_layer.add(tf.keras.layers.ReLU())
+        resamp_layer.add(ReLU())
 
     return resamp_layer
 
@@ -218,9 +231,9 @@ def unet(
     model_name: str | None = None,
     flip_aug: bool = True,
     trans_aug: bool = False,
-    apply_batchnorm: bool | Iterable[bool] = True,
-    apply_dropout: bool | Iterable[bool] = False,
-) -> tf.keras.Model:
+    apply_batchnorm: bool | list[bool] = True,
+    apply_dropout: bool | list[bool] = False,
+) -> Model:
     """
     Simple encoder-decoder U-Net architecture.
 
@@ -257,31 +270,29 @@ def unet(
     resamp_kernel_size = 4
 
     # Create vectors for batchnorm / dropout booleans if scalar
-    if not isinstance(apply_batchnorm, Iterable):
+    if not isinstance(apply_batchnorm, Iterable) or isinstance(apply_batchnorm, bool):
         apply_batchnorm = [apply_batchnorm for _ in range(depth * 2)]
 
-    if not isinstance(apply_dropout, Iterable):
+    if not isinstance(apply_dropout, Iterable) or isinstance(apply_dropout, bool):
         apply_dropout = [apply_dropout for _ in range(depth * 2)]
 
     # Define input
-    inputs = tf.keras.layers.Input(
+    inputs = Input(
         shape=[None, None, input_channels], name="input_image"
     )  # Using None to signal variable image width and height (Ny,Nx,3)
     x = inputs  # x used as temparary variable for data flowing between layers
 
     # Add augmentation layer(s)
     if flip_aug or trans_aug:
-        aug_layer = tf.keras.Sequential(name="augmentation")
+        aug_layer = Sequential(name="augmentation")
         if flip_aug:
-            aug_layer.add(tf.keras.layers.RandomFlip())
+            aug_layer.add(RandomFlip())
         if trans_aug:
-            aug_layer.add(
-                tf.keras.layers.RandomTranslation(height_factor=0.2, width_factor=0.2)
-            )
+            aug_layer.add(RandomTranslation(height_factor=0.2, width_factor=0.2))
         x = aug_layer(x)
 
     # Add initial convolution layer with same resolution as input image
-    x = tf.keras.layers.Conv2D(
+    x = Conv2D(
         first_layer_channels,
         kernel_size=3,
         padding="same",
@@ -344,12 +355,12 @@ def unet(
     names_skip = [f"skipconnection_res_1_{2**i}" for i in range(depth - 1, -1, -1)]
     for up, skip, skipname in zip(up_stack, skips, names_skip):
         x = up(x)  # Run input x through layer, then set x to output
-        x = tf.keras.layers.Concatenate(name=skipname)(
+        x = Concatenate(name=skipname)(
             [x, skip]
         )  # Stack layer output together with skip connection
 
     # Final layer
-    last = tf.keras.layers.Conv2D(
+    last = Conv2D(
         output_channels,
         kernel_size=3,
         padding="same",
@@ -358,7 +369,7 @@ def unet(
     )
     x = last(x)
 
-    model = tf.keras.Model(inputs=inputs, outputs=x, name=model_name)
+    model = Model(inputs=inputs, outputs=x, name=model_name)
 
     return model
 
@@ -395,7 +406,7 @@ def add_background_zero_weight(
     return image, labels, sample_weights
 
 
-def unet_classify_single_image(unet: tf.keras.Model, image: np.ndarray) -> np.ndarray:
+def unet_classify_single_image(unet: Model, image: np.ndarray) -> np.ndarray:
     """
     Classify single image using UNet.
 
@@ -418,7 +429,7 @@ def unet_classify_single_image(unet: tf.keras.Model, image: np.ndarray) -> np.nd
     return labels
 
 
-def unet_classify_image_batch(unet: tf.keras.Model, batch: np.ndarray) -> np.ndarray:
+def unet_classify_image_batch(unet: Model, batch: np.ndarray) -> np.ndarray:
     """
     Classify image batch using UNet.
 
