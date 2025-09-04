@@ -11,7 +11,7 @@ FIRST_LAYER_CHANNELS = 32
 OUTPUT_CHANNELS = 8
 BATCH_SIZE = 8
 DEPTH = 2
-EPOCHS = 10
+EPOCHS = 5
 
 # Define dataset paths
 dataset_base_path = Path(
@@ -38,6 +38,7 @@ print(f"Number of training tiles: {n_tiles_train}")
 print(f"Number of validation tiles: {n_tiles_val}")
 print(f"Tile data shape (PCA tiles): {(tile_nrows, tile_ncols, tile_nchannels)}")
 
+
 # Create the U-Net model
 unet_model = unet(
     input_channels=tile_nchannels,
@@ -49,6 +50,7 @@ unet_model.summary()
 
 
 def add_sample_weights(image, label, name):
+    """Add sample weights, compatible with dataset "map" method."""
     # class_weights = tf.constant([0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]) # Hard-coded for 7 classes
     class_weights = tf.constant(
         [0.0, 0.89, 1.24, 0.82, 0.65, 1.08, 1.54, 0.77]
@@ -58,7 +60,6 @@ def add_sample_weights(image, label, name):
     # Create an image of `sample_weights` by using the label at each pixel as an
     # index into the `class weights` .
     sample_weights = tf.gather(class_weights, indices=tf.cast(label, tf.int32))
-
     return image, label, sample_weights
 
 
@@ -67,24 +68,22 @@ train_dataset = train_dataset.shuffle(buffer_size=n_tiles_train)
 train_dataset = train_dataset.map(add_sample_weights)
 val_dataset = val_dataset.map(add_sample_weights)
 
-# Batch datasets
-train_dataset_batch = train_dataset.batch(BATCH_SIZE)
-val_dataset_batch = val_dataset.batch(BATCH_SIZE)
 
 # Compile model
 unet_model.compile(
     optimizer=RMSprop(0.0001),
     loss="sparse_categorical_crossentropy",
     weighted_metrics=[
-        "sparse_categorical_accuracy"
-    ],  # Need weights to ignore background
+        "sparse_categorical_accuracy"  # Sparse because classes are numbered, not one-hot
+    ],
     metrics=[],
-)  # Sparse because classes are numbered, not one-hot
+)
 print("Model compiled")
 
+
 # Train model
-# history = unet_model.fit(
-#     train_dataset.batch(BATCH_SIZE),
-#     epochs=EPOCHS,
-#     validation_data=val_dataset.batch(BATCH_SIZE),
-# )
+history = unet_model.fit(
+    train_dataset.batch(BATCH_SIZE),
+    epochs=EPOCHS,
+    validation_data=val_dataset.batch(BATCH_SIZE),
+)
