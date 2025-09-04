@@ -6,24 +6,29 @@ import tensorflow as tf
 
 
 def pad_image_to_multiple(image: np.ndarray, multiple: int) -> np.ndarray:
-    """Zero-pad image spatially to multiple of given number
+    """
+    Zero-pad image spatially to a multiple of a given number.
 
-    # Input arguments
-    image:        2D / 3D numpy array
-    multiple:     Integer
+    Parameters
+    ----------
+    image : np.ndarray
+        2D or 3D numpy array.
+    multiple : int
+        The integer multiple to pad to.
 
-    # Example:
-    image = np.ones((2,5))
-    padded_image = pad_image_to_multiple(image,4)
+    Returns
+    -------
+    np.ndarray
+        Padded image array.
 
-    image is a 2x5 matrix of ones:
-        [[1. 1. 1. 1. 1.]
-         [1. 1. 1. 1. 1.]]
-    padded_image is a 4x8 matrix padded with zeros, with image in upper left corner:
-        [[1. 1. 1. 1. 1. 0. 0. 0.]
-         [1. 1. 1. 1. 1. 0. 0. 0.]
-         [0. 0. 0. 0. 0. 0. 0. 0.]
-         [0. 0. 0. 0. 0. 0. 0. 0.]]
+    Examples
+    --------
+    >>> image = np.ones((2, 5))
+    >>> pad_image_to_multiple(image, 4)
+    array([[1., 1., 1., 1., 1., 0., 0., 0.],
+           [1., 1., 1., 1., 1., 0., 0., 0.],
+           [0., 0., 0., 0., 0., 0., 0., 0.],
+           [0., 0., 0., 0., 0., 0., 0., 0.]])
     """
     nrows_pad = math.ceil(image.shape[0] / multiple) * multiple
     ncols_pad = math.ceil(image.shape[1] / multiple) * multiple
@@ -47,26 +52,31 @@ def labeled_image_to_tensor_tiles(
     padding: str = "SAME",
     min_labeled_fraction: float = 0.05,
 ) -> tuple[tf.Tensor, tf.Tensor]:
-    """Split image and label mask into smaller tiles
-
-    # Usage:
-    (image_tiles,label_tiles) = ...
-
-    # Input arguments:
-    image:        3D numpy array with dimensions (rows, columns, channels)
-    labels:       2D numpy array with dimensions (rows,columns)
-    tile_shape:   Tuple of integers, (tile_rows, tile_cols)
-
-    # Keyword arguments
-    tile_strides: Tuple of integers, (row_stride, col_stride)
-                  If None, set equal to tile_shape (no overlap between tiles)
-    padding:      'VALID' or 'SAME' (see tensorflow.image.extract_patches)
-                  Default: 'SAME'
-    min_labeled_fraction:   Use this to filter out tiles with zero or low
-                            number of labeled pixels. Set to zero to include all
-                            pixels.
     """
+    Split image and label mask into smaller tiles.
 
+    Parameters
+    ----------
+    image : np.ndarray
+        3D numpy array with dimensions (rows, columns, channels).
+    labels : np.ndarray
+        2D numpy array with dimensions (rows, columns).
+    tile_shape : tuple of int
+        (tile_rows, tile_cols).
+    tile_strides : tuple of int, optional
+        (row_stride, col_stride). If None, set equal to tile_shape (no overlap).
+    padding : str, optional
+        'VALID' or 'SAME'. Default is 'SAME'.
+    min_labeled_fraction : float, optional
+        Filter out tiles with low number of labeled pixels. Default is 0.05.
+
+    Returns
+    -------
+    image_tiles : tf.Tensor
+        Tensor of image tiles.
+    label_tiles : tf.Tensor
+        Tensor of label tiles.
+    """
     if tile_strides is None:
         tile_strides = tile_shape
 
@@ -112,17 +122,40 @@ def resampling_layer(
     apply_dropout: bool = False,
     dropout_rate: float = 0.5,
 ) -> tf.keras.Sequential:
-    """Spatial resampling 2D convolutional layer
+    """
+    Spatial resampling 2D convolutional layer.
 
-    # Input parameters:
-    resampling_type:    'downsample' (convolution) or 'upsample' (transpose convolution)
-    filter_channels:    Number of filters / "depth" of output
-                        For images, this corresponds to number of color / wavelength channels
-    kernel_size:        Spatial size of convolutional kernel
-                        For images, if kernel_size = 3, each filter processes a 3x3 pixel neighborhood
+    Parameters
+    ----------
+    resampling_type : str
+        'downsample' (convolution) or 'upsample' (transpose convolution).
+    filter_channels : int
+        Number of filters / output channels.
+    kernel_size : int
+        Spatial size of convolutional kernel.
+    resampling_factor : int, optional
+        Stride for resampling. Default is 2.
+    name : str, optional
+        Name of the layer.
+    initializer_mean : float, optional
+        Mean for kernel initializer. Default is 0.0.
+    initializer_std : float, optional
+        Std for kernel initializer. Default is 0.02.
+    apply_batchnorm : bool, optional
+        Whether to apply batch normalization. Default is True.
+    apply_dropout : bool, optional
+        Whether to apply dropout. Default is False.
+    dropout_rate : float, optional
+        Dropout rate. Default is 0.5.
 
-    # Notes
-    - Based on TF example pix2pix: https://www.tensorflow.org/tutorials/generative/pix2pix
+    Returns
+    -------
+    tf.keras.Sequential
+        The resampling layer.
+
+    Notes
+    -----
+    Based on TF example pix2pix: https://www.tensorflow.org/tutorials/generative/pix2pix
     """
     # Validate resampling layer type
     if resampling_type not in ["downsample", "upsample"]:
@@ -188,45 +221,38 @@ def unet(
     apply_batchnorm: bool | Iterable[bool] = True,
     apply_dropout: bool | Iterable[bool] = False,
 ) -> tf.keras.Model:
-    """Simple encoder-decoder U-Net architecture
+    """
+    Simple encoder-decoder U-Net architecture.
 
-    # Arguments:
-    input_channels:         Number of channels in input image
-    output_channels:        Number of classes (including background) to segment between
-    first_layer_channels:   Number of channels in first downsampling layer
-                            Each consecutive downsampling layer doubles the number of channels
-                            In upsampling, each layer halves the number of channels
-    depth:                  Number of resampling steps to perform.
-                            Example: If depth = 3, the original image is downsampled to
-                            resolutions 1/2, 1/4 and 1/8 of the original resolution, and then
-                            upsampled to the original resolution via the same steps.
-                            The total number of down- and upsampling layers is thus
-                            equal to 2*depth (6 for the example above).
+    Parameters
+    ----------
+    input_channels : int
+        Number of channels in input image.
+    output_channels : int
+        Number of classes to segment between.
+    first_layer_channels : int
+        Number of channels in first downsampling layer.
+    depth : int
+        Number of resampling steps to perform.
+    model_name : str, optional
+        Name of model.
+    flip_aug : bool, optional
+        If True, include RandomFlip augmentation layer.
+    trans_aug : bool, optional
+        If True, include RandomTranslation augmentation layer.
+    apply_batchnorm : bool or Iterable[bool], optional
+        Use batch normalization in layers.
+    apply_dropout : bool or Iterable[bool], optional
+        Use dropout in layers.
 
-    # Keyword arguments:
-    model_name:               Name of model
-    flip_aug:           If true, a RandomFlip augmentation layer is included
-                        before the first downsampling layer
-    trans_aug:          If true, a RandomTranslation augmentation layer with
-                        height and width factor of 20% is included
-                        before the first downsampling layer
-    apply_batchnorm:    If (boolean) scalar, indicate whether to use batch normalization
-                        in all downsampling / upsampling layers
-                        If tuple of booleans (length equal to total number of
-                        downsampling / upsampling layers), indicate use of batch noarmalization
-                        for each layer
-    apply_dropout:      If (boolean) scalar, indicate whether to use dropout (rate 0.5)
-                        in all downsampling / upsampling layers.
-                        If tuple of booleans (length equal to total number of
-                        downsampling / upsampling layers), indicate use of dropout
-                        for each layer
+    Returns
+    -------
+    tf.keras.Model
+        Keras U-Net model.
 
-    # Outputs:
-    model:              Keras U-Net model
-
-    # Notes:
-    - Based on TF tutorial: https://www.tensorflow.org/tutorials/images/segmentation
-
+    Notes
+    -----
+    Based on TF tutorial: https://www.tensorflow.org/tutorials/images/segmentation
     """
     resamp_kernel_size = 4
 
@@ -340,11 +366,24 @@ def unet(
 def add_background_zero_weight(
     image: tf.Tensor, labels: tf.Tensor
 ) -> tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
-    """Add weight "image" with zero weight for background
+    """
+    Add weight image with zero weight for background.
 
-    # Typical usage:
-    dataset_with_weights = dataset.map(add_background_zero_weight)
+    Parameters
+    ----------
+    image : tf.Tensor
+        Input image tensor.
+    labels : tf.Tensor
+        Label tensor.
 
+    Returns
+    -------
+    image : tf.Tensor
+        Input image tensor (unchanged).
+    labels : tf.Tensor
+        Label tensor (unchanged).
+    sample_weights : tf.Tensor
+        Tensor with zero weight for background pixels.
     """
     label_mask = tf.greater(labels, 0)
     zeros = tf.zeros_like(labels, dtype=tf.float32)
@@ -357,15 +396,20 @@ def add_background_zero_weight(
 
 
 def unet_classify_single_image(unet: tf.keras.Model, image: np.ndarray) -> np.ndarray:
-    """Classify single image using UNet
+    """
+    Classify single image using UNet.
 
-    # Arguments:
-    unet:     Trained Unet model (Keras)
-    image:    Single image (3D Numpy array)
+    Parameters
+    ----------
+    unet : tf.keras.Model
+        Trained Unet model (Keras).
+    image : np.ndarray
+        Single image (3D numpy array).
 
-    # Returns
-    labels:     2D image with integer class labels, found by using
-                np.argmax() on unet output (which has one channel per class)
+    Returns
+    -------
+    np.ndarray
+        2D image with integer class labels.
     """
 
     # Get activations by running predict(), insert extra dimension for 1-element batch
@@ -375,15 +419,20 @@ def unet_classify_single_image(unet: tf.keras.Model, image: np.ndarray) -> np.nd
 
 
 def unet_classify_image_batch(unet: tf.keras.Model, batch: np.ndarray) -> np.ndarray:
-    """Classify image batch using UNet
+    """
+    Classify image batch using UNet.
 
-    # Arguments:
-    unet:     Trained Unet model (Keras)
-    batch:    Batch of images (4D NumPy array)
+    Parameters
+    ----------
+    unet : tf.keras.Model
+        Trained Unet model (Keras).
+    batch : np.ndarray
+        Batch of images (4D numpy array).
 
-    # Returns
-    labels:     3D array with integer class labels, found by using
-                np.argmax() on unet output (which has one channel per class)
+    Returns
+    -------
+    np.ndarray
+        3D array with integer class labels.
     """
 
     # Get activations by running predict(), use argmax to find class label
