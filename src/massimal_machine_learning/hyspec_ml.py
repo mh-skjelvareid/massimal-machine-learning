@@ -2,124 +2,6 @@ import numpy as np
 import numpy.random
 
 
-def save_pca_model(
-    pca_model, X_notscaled, npz_filename, n_components="all", feature_labels=None
-):
-    """Save PCA weights and X mean and std as NumPy npz file
-
-    # Arguments:
-    pca_model       sklearn.decomposition.PCA model which has beed fitted to (scaled) data X_scaled
-    X_notscaled     X array before scaling - used to calculate "original" mean / std
-    npz_filename    Path to *.npz file where data will be saved
-
-    # Keyword arguments
-    n_components    Number of PCA components to include
-    feature_labels  Array with labels for each feature (each column of X)
-
-    # Notes:
-    The function will save the following arrays to the npz. file:
-        - W_pca:  PCA "weights", shape (N_components, N_features)
-        - X_mean: X mean values, shape (N_features,)
-        - X_std:  X standard deviations, shape (N_features,)
-        - explained_variance_ratio, shape (N_components,)
-        - feature_labels (optional), shape (N_features,)
-    """
-    # If n_components specified, only use n first components
-    if n_components != "all":
-        W_pca = pca_model.components_[0:n_components, :]
-        explained_variance_ratio = pca_model.explained_variance_ratio_[0:n_components]
-    else:
-        W_pca = pca_model.components_
-        explained_variance_ratio = pca_model.explained_variance_ratio_
-
-    # Save as npz file
-    np.savez(
-        npz_filename,
-        W_pca=W_pca,
-        X_mean=np.mean(X_notscaled, axis=0),
-        X_std=np.std(X_notscaled, axis=0),
-        explained_variance_ratio=explained_variance_ratio,
-        feature_labels=feature_labels,
-    )
-
-
-def read_pca_model(
-    npz_filename, include_explained_variance=False, include_feature_labels=False
-):
-    """Load PCA weights and X mean and std from NumPy npz file
-
-    # Arguments:
-    npz_filename    Path to *.npz file where data is saved
-
-    # Keyword arguments:
-    include_explained_variance - whether to include explained variance
-    include_feature_labels - whether to include feature labels
-
-    # Returns:
-    W_pca:    PCA "weights", shape (N_components, N_features)
-    X_mean:   X mean values, shape (1,N_features,)
-    X_std:    X standard deviations, shape (1,N_features)
-    explained_variance_ratio (optional), shape (N_components,)
-    feature_labels (optional), shape (N_features,)
-    """
-    return_list = []
-    with np.load(npz_filename) as npz_files:
-        return_list.append(npz_files["W_pca"])
-        return_list.append(npz_files["X_mean"])
-        return_list.append(npz_files["X_std"])
-        if include_explained_variance:
-            return_list.append(npz_files["explained_variance_ratio"])
-        if include_feature_labels:
-            return_list.append(npz_files["feature_labels"])
-
-    return tuple(return_list)
-
-
-def pca_transform_image(image, W_pca, X_mean, X_std=None):
-    """Apply PCA transform to 3D image cube
-
-    # Arguments:
-    image       NumPy array with 3 dimensions (n_rows,n_cols,n_channels)
-    W_pca       PCA weight matrix with 2 dimensions (n_components, n_channels)
-    X_mean      Mean value vector, to be subtracted from data ("centering")
-                Length (n_channels,)
-
-    # Keyword arguments:
-    X_std       Standard deviation vector, to be used for scaling (z score)
-                If None, no scaling is performed
-                Length (n_channels)
-
-    # Returns:
-    image_pca   Numpy array with dimension (n_rows, n_cols, n_channels)
-
-    # Notes:
-    - Input pixels which are zero across all channels are set to zero in the
-    output PCA image as well.
-
-    """
-    # Create mask for nonzero values
-    nonzero_mask = ~np.all(image == 0, axis=2, keepdims=True)
-
-    # Vectorize image
-    im_vec = np.reshape(image, (-1, image.shape[-1]))
-
-    # Subtract mean (always) and scale (optional)
-    im_vec_norm = im_vec - X_mean
-    if X_std is not None:
-        im_vec_norm = im_vec_norm / X_std
-
-    # PCA transform through matrix multiplication (projection to rotated coordinate system)
-    im_vec_pca = im_vec_norm @ W_pca.T
-
-    # Reshape into image, and ensure that zero-value input pixels are also zero in output
-    im_pca = (
-        np.reshape(im_vec_pca, image.shape[0:2] + (im_vec_pca.shape[-1],))
-        * nonzero_mask
-    )
-
-    return im_pca
-
-
 def kfold_generator(dataset, k):
     """Generator for K-fold splitting into training and validation datasets
 
@@ -217,3 +99,160 @@ def random_sample_image(image, frac=0.05, ignore_zeros=True, replace=False):
     samp = rng.choice(image[mask], size=n_samp, axis=0, replace=replace)
 
     return samp
+
+
+def create_sample_count_matrix(X, class_col_ind, group_col_ind):
+    """Create a sample count matrix from data matrix X.
+
+    Parameters
+    ----------
+    X : ndarray
+        2-D array with samples on rows. Must contain integer labels for class and
+        group in the columns specified by class_col_ind and group_col_ind.
+    class_col_ind : int
+        Column index in X containing zero-indexed class labels (0 .. n_classes-1).
+    group_col_ind : int
+        Column index in X containing zero-indexed group/location labels
+        (0 .. n_groups-1).
+
+    Returns
+    -------
+    sample_count_matrix : ndarray of int, shape (n_groups, n_classes)
+        Matrix where entry (i, j) is the number of samples that belong to group i
+        and class j.
+
+    Notes
+    -----
+    n_classes and n_groups are inferred from the maximum label values in the
+    respective columns of X. The function asserts that the minimum label in each
+    column is 0 and that there is at least two classes and two groups.
+    """
+    n_classes = np.max(X[:, class_col_ind]).astype(int) + 1
+    n_groups = np.max(X[:, group_col_ind]).astype(int) + 1
+
+    assert min(X[:, class_col_ind]) == 0 and n_classes >= 2
+    assert min(X[:, group_col_ind]) == 0 and n_groups >= 2
+
+    sample_count_matrix = np.zeros((n_groups, n_classes), dtype=int)
+
+    for group_int in range(n_groups):
+        for class_int in range(n_classes):
+            sample_count_matrix[group_int, class_int] = np.sum(
+                (X[:, group_col_ind] == group_int) & (X[:, class_col_ind] == class_int)
+            )
+
+    return sample_count_matrix
+
+
+def gamma_weight_vector(vec: NDArray, gamma: float = 0.8):
+    """Apply gamma weighting (softly reduce range of values) to input vector.
+
+    Parameters
+    ----------
+    vec : ndarray
+        1-D array of non-negative values to be gamma-weighted.
+    gamma : float, optional
+        Exponent for gamma weighting. Must be in range [0, 1].
+
+    Returns
+    -------
+    vec_weighted : ndarray
+        Gamma-weighted version of input vector.
+
+    """
+
+    assert np.all(vec >= 0), "Input vector elements must be non-negative."
+    assert (gamma >= 0) & (gamma <= 1), "Gamma must be in range [0, 1]."
+
+    nonzero_ind = vec > 0
+    nonzero_min = np.min(vec[nonzero_ind])
+
+    vec_weighted = np.zeros_like(vec)
+    vec_weighted[nonzero_ind] = nonzero_min + (vec[nonzero_ind] - nonzero_min) ** gamma
+
+    return vec_weighted
+
+
+def balance_classes_per_group(sample_count_matrix, class_gamma=0.8):
+    """Balance classes per group using gamma weighting.
+
+    Parameters
+    ----------
+    sample_count_matrix : ndarray of int, shape (n_groups, n_classes)
+        Matrix where entry (i, j) is the number of samples that belong to group i
+        and class j.
+
+    Returns
+    -------
+    balanced_sample_count_matrix : ndarray of int, shape (n_groups, n_classes)
+        Matrix with same shape as input where classes have been balanced per group
+        using gamma weighting.
+    """
+    balanced_sample_count_matrix = np.zeros_like(sample_count_matrix)
+
+    # Apply gamma weighting to each group's class counts
+    for group_int, class_counts in enumerate(sample_count_matrix):
+        balanced_sample_count_matrix[group_int] = gamma_weight_vector(
+            class_counts, gamma=class_gamma
+        ).astype(int)
+
+    return balanced_sample_count_matrix
+
+
+def balance_samples_between_groups(sample_count_matrix, group_gamma=0.9):
+    """Balance samples between groups using gamma weighting.
+
+    Parameters
+    ----------
+    sample_count_matrix : array_like, shape (n_groups, n_categories)
+        Non-negative counts for each group (rows) and category/feature (columns).
+
+    group_gamma : float, optional (default=0.9)
+        Gamma parameter controlling the strength of the weighting applied when
+        computing target sample counts.
+
+    Returns
+    -------
+    balanced_sample_matrix : ndarray, shape (n_groups, n_categories)
+        Integer array with the same shape as ``sample_count_matrix``.
+    """
+    samples_per_group = sample_count_matrix.sum(axis=1)
+    assert np.all(samples_per_group >= 0)
+
+    balanced_samples_per_group = gamma_weight_vector(
+        samples_per_group, gamma=group_gamma
+    ).astype(int)
+    balanced_sample_matrix = sample_count_matrix * (
+        balanced_samples_per_group[:, None] / samples_per_group[:, None]
+    )
+    return balanced_sample_matrix.astype(int)
+
+
+def balance_samples(sample_count_matrix, class_gamma=0.8, group_gamma=0.9):
+    """Balance samples per class and between groups using gamma weighting.
+
+    Parameters
+    ----------
+    sample_count_matrix : ndarray of int, shape (n_groups, n_classes)
+        Matrix where entry (i, j) is the number of samples that belong to group i
+        and class j.
+    class_gamma : float, optional
+        Gamma parameter for balancing classes per group.
+    group_gamma : float, optional
+        Gamma parameter for balancing samples between groups.
+
+    Returns
+    -------
+    balanced_sample_count_matrix : ndarray of int, shape (n_groups, n_classes)
+        Matrix with same shape as input where classes have been balanced per group
+        and samples have been balanced between groups using gamma weighting.
+
+    """
+    sample_matrix_balanced_per_group = balance_classes_per_group(
+        sample_count_matrix, class_gamma=class_gamma
+    )
+    balanced_sample_count_matrix = balance_samples_between_groups(
+        sample_matrix_balanced_per_group, group_gamma=group_gamma
+    )
+
+    return balanced_sample_count_matrix
