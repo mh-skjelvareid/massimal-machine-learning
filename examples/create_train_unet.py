@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import tensorflow as tf
-from tensorflow.keras.optimizers import RMSprop
+from keras.optimizers import RMSprop
 
 from massimal_machine_learning.hyspec_cnn import unet
 
