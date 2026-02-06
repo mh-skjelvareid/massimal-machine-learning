@@ -4,9 +4,10 @@ import json
 import warnings
 from pathlib import Path
 
-import hyspec_io
 import numpy as np
 import skimage.io
+
+from massimal_machine_learning.hyspec_io import load_envi_image
 
 
 def read_hasty_metadata(hasty_json: Path | str) -> dict:
@@ -357,7 +358,7 @@ def collect_annotated_data(
             )
         hyspec_file = str(hyspec_file_list[0])
         print("Opening file " + hyspec_file)
-        (im_cube, wl, rgb_ind, _) = hyspec_io.load_envi_image(hyspec_file)
+        (im_cube, wl, rgb_ind, _) = load_envi_image(hyspec_file)
 
         # Create non-zero mask
         nonzero_mask = ~np.all(im_cube == 0, axis=2)
