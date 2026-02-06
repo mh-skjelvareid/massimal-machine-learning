@@ -1,3 +1,13 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/massimal_machine_learning"]
+
+[tool.hatch.build.targets.wheel.include]
+"src/massimal_machine_learning/data/*.json" = "massimal_machine_learning/data/*.json"
+
 [project]
 name = "massimal-machine-learning"
 version = "0.1.0"
@@ -11,3 +21,17 @@ dependencies = [
     "spectral>=0.24",
     "tensorflow>=2.20.0",
 ]
+
+authors = [
+  {name = "Martin H. Skjelvareid"},
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "I"]
+
+[tool.ruff.format]
+docstring-code-format = true
+docstring-code-line-length = 88
