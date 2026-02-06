@@ -1,5 +1,6 @@
 import numpy as np
 import numpy.random
+from numpy.typing import NDArray
 
 
 def kfold_generator(dataset, k):
