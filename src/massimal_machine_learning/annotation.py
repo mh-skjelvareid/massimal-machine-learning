@@ -240,25 +240,27 @@ def merge_classes_in_label_vector(
     classes_to_merge: list[list[str]],
     merged_class_names: list[str],
 ) -> tuple[dict[str, int], np.ndarray]:
-    """Merge subsets of a set of annotated classes
+    """
+    Merge subsets of a set of annotated classes in a label vector.
 
-    # Usage
-    (class_dict_merged, y_merged) = merge_classes_in_label_vector(
-        class_dict,y,classes_to_merge,merged_class_names)
+    Parameters
+    ----------
+    class_dict : dict[str, int]
+        Keys = class names, values = class indices.
+    y : np.ndarray
+        Label vector with class indices (integers).
+    classes_to_merge : list[list[str]]
+        Each sub-list contains classes to be merged into a single new class.
+    merged_class_names : list[str]
+        Names for each new merged class.
 
-    # Required arguments
-    class_dict:             Dict, keys = class names, values = class indices
-    y:                      Label vector (integers)
-    classes_to_merge:       List of lists, each sub-list containing classes to
-                            be merged into a single new class
-    merged_class_names:     List with names for each new merged class
-
-
-    # Returns
-    class_dict_merged       Dict, keys = merged class names,
-                            values = updated class indices
-    y_merged                Image, map of class indices for extracted classes
-
+    Returns
+    -------
+    tuple
+        class_dict_merged : dict[str, int]
+            Keys = merged class names, values = updated class indices.
+        y_merged : np.ndarray
+            Label vector with class indices for merged classes.
     """
 
     assert len(classes_to_merge) == len(merged_class_names)
