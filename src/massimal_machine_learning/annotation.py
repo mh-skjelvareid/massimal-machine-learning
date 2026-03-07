@@ -214,9 +214,7 @@ def merge_classes_with_mask(
                 class_dict_copy.pop(class_name)
 
                 # Update mask
-                merged_class_mask[class_mask == class_dict[class_name]] = (
-                    merged_class_ind
-                )
+                merged_class_mask[class_mask == class_dict[class_name]] = merged_class_ind
             else:
                 raise ValueError(
                     'Class name "'
@@ -353,9 +351,7 @@ def collect_annotated_data(
         # Load hyperspectral file
         hyspec_file_list = list(Path(hyspec_dir).glob(file_base_name + "*.hdr"))
         if not hyspec_file_list:
-            raise FileNotFoundError(
-                f"No .hdr file found for {file_base_name} in {hyspec_dir}"
-            )
+            raise FileNotFoundError(f"No .hdr file found for {file_base_name} in {hyspec_dir}")
         hyspec_file = str(hyspec_file_list[0])
         print("Opening file " + hyspec_file)
         (im_cube, wl, rgb_ind, _) = load_envi_image(hyspec_file)
@@ -442,7 +438,8 @@ def class_indices_from_hierarchy(
 ) -> dict[str, set[int]]:
     """Group class indices based on class hierarchy
 
-    # Input arguments:
+    Parameters
+    ----------
     class_hierarchy: dict
         See massimal_annotation_class_hierarchy.json
         Nested dictionary, with outer levels being more general and inner levels
@@ -460,12 +457,14 @@ def class_indices_from_hierarchy(
         subcategory of another class in the list. However, this is not checked
         by the code.
 
-    # Returns:
+    Returns
+    -------
     grouped_class_indices: dict
         Dictionary with grouped class names as keys and list of corresponding class indices
         as values.
 
-    # Example:
+    Example
+    -------
     class_hierarchy = {'Vegetation':{'Grass':[],'Trees':['Oak','Birch']},
         'Rock':['Bedrock','Cobble'],'Buildings':[]}
     class_indices = {'Vegetation':1,'Grass':2,'Trees':3,'Oak':4,'Birch':5,
@@ -480,9 +479,7 @@ def class_indices_from_hierarchy(
     for class_name in class_names:
         # Check if class name is present in class_indices
         if class_name not in class_indices:
-            warnings.warn(
-                f'Class name "{class_name}" is not included in class_indices.'
-            )
+            warnings.warn(f'Class name "{class_name}" is not included in class_indices.')
             continue
 
         # Get indices corresponding to class name
@@ -511,8 +508,10 @@ def _collect_all_class_branch_indices(
                 f'Class name "{current_class_name}" in class_hierarchy not present as key in class_indices.'
             )
         if isinstance(class_branch, dict):  # If dictionary (nested),
-            branch_indices += _collect_all_class_branch_indices(  # recursively collect all "child" indices
-                class_branch[current_class_name], class_indices
+            branch_indices += (
+                _collect_all_class_branch_indices(  # recursively collect all "child" indices
+                    class_branch[current_class_name], class_indices
+                )
             )
     return branch_indices
 
@@ -528,9 +527,7 @@ def _class_hierarchy_search(
             break
         if current_class_name == class_name:  # If class name found,
             group_indices.append(class_indices[class_name])  # add index for class, and
-            if isinstance(
-                class_hierarchy, dict
-            ):  # if subclasses are present, add them as well
+            if isinstance(class_hierarchy, dict):  # if subclasses are present, add them as well
                 group_indices += _collect_all_class_branch_indices(
                     class_hierarchy[current_class_name], class_indices
                 )
@@ -547,7 +544,8 @@ def class_map_for_grouped_indices(
 ) -> tuple[np.ndarray, dict[str, int]]:
     """Convert map with integer class labels to grouped labels
 
-    # Input arguments:
+    Parameters
+    ----------
     class_map:
         Integer array with class labels.
         Value 0 is reserved for background.
@@ -555,7 +553,8 @@ def class_map_for_grouped_indices(
         Dictionary with group names (keys) and sets of integers indicating
         integer labels for classes included in the group.
 
-    # Returns:
+    Returns
+    -------
     group_map:
         Map with same dimensions as class_map, but using integer labels
         corresponding to grouped classes.
