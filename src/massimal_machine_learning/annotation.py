@@ -2,6 +2,7 @@
 import copy
 import json
 import warnings
+from importlib.resources import files
 from pathlib import Path
 
 import numpy as np
@@ -573,3 +574,21 @@ def class_map_for_grouped_indices(
             class_mask = class_map == class_index
             group_map[class_mask] = group_index
     return group_map, group_indices
+
+
+def load_class_hierarchy() -> dict:
+    """Read the class hierarchy from JSON file.
+
+    Returns
+    -------
+    dict
+        Nested dictionary describing the Massimal annotation class hierarchy.
+        Outer levels are more general and inner levels are more specific.
+
+    """
+
+    data_files = files("massimal_machine_learning").joinpath("data")
+    hierarchy_file = data_files.joinpath("massimal_annotation_class_hierarchy.json")
+    with hierarchy_file.open("r", encoding="utf-8") as f:
+        class_hierarchy = json.load(f)
+    return class_hierarchy
