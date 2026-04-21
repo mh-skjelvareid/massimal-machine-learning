@@ -78,10 +78,6 @@ def save_class_dict(class_dict: dict, json_file: Path | str):
         Example: {"Water": 1, "Land": 2}
     json_file : Path or str
         Path to JSON file where dictionary will be saved.
-
-    Notes
-    -----
-    The JSON file is written using UTF-8 encoding, sets the ensure_ascii option to False to allow a larger range of symbols in class names, and uses indent=4 to make the file easier to read.
     """
 
     with open(json_file, "w", encoding="utf-8") as write_file:
