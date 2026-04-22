@@ -19,6 +19,7 @@ dependencies = [
     "pycocotools>=2.0.11",
     "pytest>=9.0.2",
     "scikit-image>=0.25.2",
+    "scikit-learn>=1.8.0",
     "spectral>=0.24",
     "tensorflow>=2.20.0",
     "torch>=2.11.0",

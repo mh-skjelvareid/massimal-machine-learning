@@ -1,8 +1,18 @@
+import json
+from pathlib import Path
+from typing import Literal
+
 import numpy as np
+from numpy.typing import NDArray
+from sklearn.decomposition import PCA
 
 
-def save_pca_model(
-    pca_model, X_notscaled, npz_filename, n_components="all", feature_labels=None
+def save_pca_model_numpy(
+    pca_model: PCA,
+    X_notscaled: NDArray,
+    npz_filename: Path | str,
+    n_components: int | Literal["all"] = "all",
+    feature_labels=None,
 ):
     """Save PCA weights and X mean and std as NumPy npz file
 
@@ -42,8 +52,10 @@ def save_pca_model(
     )
 
 
-def read_pca_model(
-    npz_filename, include_explained_variance=False, include_feature_labels=False
+def read_pca_model_numpy(
+    npz_filename: Path | str,
+    include_explained_variance: bool = False,
+    include_feature_labels: bool = False,
 ):
     """Load PCA weights and X mean and std from NumPy npz file
 
@@ -74,28 +86,97 @@ def read_pca_model(
     return tuple(return_list)
 
 
-def pca_transform_image(image, W_pca, X_mean, X_std=None):
+def save_pca_model_json(pca: PCA, mean: NDArray, std: NDArray, output_path: Path | str):
+    """Save trained PCA model with z-score parameters as JSON file
+
+    Parameters
+    ----------
+    pca : PCA
+        Trained slkearn.decomposition.PCA model
+    mean : NDArray
+        Mean values used for z-score normalization
+    std : NDArray
+        Standard deviation values used for z-score normalization
+    output_path : Path | str
+        Path to output JSON file
+    """
+    pca_model_data = {
+        "pca_components": pca.components_.tolist(),
+        "pca_explained_variance": pca.explained_variance_.tolist(),
+        "pca_explained_variance_ratio": pca.explained_variance_ratio_.tolist(),
+        "mean": mean.tolist(),
+        "std": std.tolist(),
+    }
+    with open(output_path, "w") as f:
+        json.dump(pca_model_data, f)
+
+
+def read_pca_model_json(
+    pca_json_path: Path | str, dtype: np.dtype = np.float32
+) -> tuple[NDArray, NDArray, NDArray, NDArray, NDArray]:
+    """Load trained PCA model with z-score parameters from JSON file
+
+    Parameters
+    ----------
+    pca_json_path : Path | str
+        Path to JSON file with saved PCA and z-score parameters
+    dtype: Numpy data type
+        Type to cast returned arrays as. Default np.float32.
+
+    Returns
+    -------
+    pca_components : NDArray
+        PCA components, shape (n_components, n_channels)
+    pca_explained_variance : NDArray
+        Explained variance per component
+    pca_explained_variance_ratio : NDArray
+        Explained variance per component relative to total variance
+    mean : NDArray
+        Mean values used for z-score normalization
+    std : NDArray
+        Standard deviation values used for z-score normalization
+    """
+    with open(pca_json_path, "r") as f:
+        pca_model_data = json.load(f)
+    pca_components = np.array(pca_model_data["pca_components"], dtype=dtype)
+    pca_explained_variance = np.array(pca_model_data["pca_explained_variance"], dtype=dtype)
+    pca_explained_variance_ratio = np.array(
+        pca_model_data["pca_explained_variance_ratio"], dtype=dtype
+    )
+    mean = np.array(pca_model_data["mean"], dtype=dtype)
+    std = np.array(pca_model_data["std"], dtype=dtype)
+    return (
+        pca_components,
+        pca_explained_variance,
+        pca_explained_variance_ratio,
+        mean,
+        std,
+    )
+
+
+def pca_transform_image(
+    image: NDArray, W_pca: NDArray, X_mean: NDArray, X_std: NDArray | None = None
+) -> NDArray:
     """Apply PCA transform to 3D image cube
 
-    # Arguments:
-    image       NumPy array with 3 dimensions (n_rows,n_cols,n_channels)
-    W_pca       PCA weight matrix with 2 dimensions (n_components, n_channels)
-    X_mean      Mean value vector, to be subtracted from data ("centering")
-                Length (n_channels,)
+    Parameters
+    ----------
+    image : NDArray
+        NumPy array with shape (n_rows,n_cols,n_channels)
+    W_pca : NDArray
+        PCA weight matrix with shape (n_components, n_channels)
+    X_mean : NDArray
+        Mean value vector for mean centering, shape (n_channels,)
+    X_std : NDArray | None, optional
+        Standard deviation vector for normalization (scaling), shape (n_channels,)
+        If None, no scaling is performed
 
-    # Keyword arguments:
-    X_std       Standard deviation vector, to be used for scaling (z score)
-                If None, no scaling is performed
-                Length (n_channels)
-
-    # Returns:
-    image_pca   Numpy array with dimension (n_rows, n_cols, n_channels)
-
-    # Notes:
-    - Input pixels which are zero across all channels are set to zero in the
-    output PCA image as well.
-
+    Returns
+    -------
+    NDArray
+        PCA transformed image, shape (n_rows,n_cols,n_components)
     """
+
     # Create mask for nonzero values
     nonzero_mask = ~np.all(image == 0, axis=2, keepdims=True)
 
@@ -111,9 +192,6 @@ def pca_transform_image(image, W_pca, X_mean, X_std=None):
     im_vec_pca = im_vec_norm @ W_pca.T
 
     # Reshape into image, and ensure that zero-value input pixels are also zero in output
-    im_pca = (
-        np.reshape(im_vec_pca, image.shape[0:2] + (im_vec_pca.shape[-1],))
-        * nonzero_mask
-    )
+    im_pca = np.reshape(im_vec_pca, image.shape[0:2] + (im_vec_pca.shape[-1],)) * nonzero_mask
 
     return im_pca
