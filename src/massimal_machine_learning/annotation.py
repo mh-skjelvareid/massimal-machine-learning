@@ -7,6 +7,7 @@ from pathlib import Path
 
 import numpy as np
 import skimage.io
+from numpy.typing import NDArray
 
 from massimal_machine_learning.hyspec_io import load_envi_image
 
@@ -504,7 +505,8 @@ def _collect_all_class_branch_indices(
             )  # Include class indices for current level
         else:
             warnings.warn(
-                f'Class name "{current_class_name}" in class_hierarchy not present as key in class_indices.'
+                f'Class name "{current_class_name}" in class_hierarchy '
+                + "not present as key in class_indices."
             )
         if isinstance(class_branch, dict):  # If dictionary (nested),
             branch_indices += (
@@ -588,3 +590,59 @@ def load_class_hierarchy() -> dict:
     with hierarchy_file.open("r", encoding="utf-8") as f:
         class_hierarchy = json.load(f)
     return class_hierarchy
+
+
+# TODO: Fill out docstrings for functions grouping categories
+
+
+def group_categories_separate_rockweed_kelp(
+    category_name_to_id: dict[str, int],
+) -> dict[str, set[int]]:
+    """Group categories keeping rockweed and kelp separate."""
+    grouped_class_names = [
+        "Sand",
+        "Rock",
+        "Maerl",
+        "Seagrass",
+        "Rockweed",
+        "Kelp",
+    ]
+
+    return class_indices_from_hierarchy(
+        load_class_hierarchy(), category_name_to_id, grouped_class_names
+    )
+
+
+def group_categories_brown_algae(category_name_to_id: dict[str, int]) -> dict[str, set[int]]:
+    """Group categories using brown algae as superclass."""
+    grouped_class_names = ["Sand", "Rock", "Maerl", "Seagrass", "Brown algae"]
+
+    return class_indices_from_hierarchy(
+        load_class_hierarchy(), category_name_to_id, grouped_class_names
+    )
+
+
+def group_categories_algae(category_name_to_id: dict[str, int]) -> dict[str, set[int]]:
+    """Group categories with all algae in single class."""
+    grouped_class_names = ["Sand", "Rock", "Seagrass", "Algae"]
+
+    return class_indices_from_hierarchy(
+        load_class_hierarchy(), category_name_to_id, grouped_class_names
+    )
+
+
+def create_grouped_category_ids(
+    grouped_class_indices: dict[str, set[int]], category_ids: NDArray
+) -> tuple[dict[str, int], NDArray]:
+
+    # Set all indices to placeholder value -1 to begin with
+    grouped_category_ids = np.full_like(category_ids, fill_value=-1)
+    group_name_to_id = {"Not included": -1}
+
+    # Create group indices, starting from 1 (keep 0 as potential background value)
+    for group_id, (group_name, class_indices) in enumerate(grouped_class_indices.items(), start=1):
+        group_name_to_id[group_name] = group_id
+        for class_index in class_indices:
+            grouped_category_ids[category_ids == class_index] = group_id
+
+    return group_name_to_id, grouped_category_ids
