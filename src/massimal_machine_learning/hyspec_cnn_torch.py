@@ -1,4 +1,5 @@
 # Converted from TF to PyTorch by Claude Haiku 4.5 (GitHub CoPilot).
+# NOTE: Not used for compare_hsi_msi_rgb project
 
 import math
 from collections.abc import Iterable
